@@ -4,12 +4,11 @@ Ce projet permet de transformer un escalier ordinaire en un piano géant. Chaque
 
 ## Fonctionnement
 
-Le système repose sur une communication bidirectionnelle entre une interface web et un Arduino :
+Le système repose sur une communication entre une interface web et un Arduino :
 
 1. Détection : Des photorésistances (LDR) reçoivent un faisceau laser. Lorsqu'une personne pose le pied sur une marche, le faisceau est coupé, la luminosité baisse, et l'Arduino détecte l'événement.
 2. Audio : L'Arduino commande un module DFPlayer Mini pour jouer le fichier MP3 correspondant à la marche.
 3. Contrôle Web : Une interface HTML/JS communique avec un serveur Node.js via Socket.io. Le serveur transmet les commandes de configuration à l'Arduino par liaison série (USB).
-4. Mode Combo : Un enchaînement spécifique (pistes 26, 27, 28, 29) déclenche la piste 30, suivie automatiquement de la piste 26.
 
 ## Matériel requis (Pour 4 marches)
 
@@ -38,6 +37,8 @@ Les fichiers audio doivent être placés à la racine de la carte SD ou dans un 
 * 0003.mp3
 * etc...
 
+Vous pouvez utiliser les fichiers fournis dans ce projet
+
 ### Configuration logicielle
 
 1. Téléversez le code Arduino situé dans le dossier arduino/ sur votre carte.
@@ -63,8 +64,7 @@ http://localhost:3000
 ## Utilisation
 
 * Interface : Cliquez sur une marche pour ouvrir le piano virtuel et assigner une nouvelle note.
-* Système : Le bouton ON/OFF permet d'activer ou de désactiver la logique de détection.
-* Presets : Le bouton Musique 1 configure automatiquement les marches pour le mode Combo (26, 27, 28, 29).
+* Presets : Le bouton Musique 1 configure automatiquement les marches pour la music Rat Dance.
 
 ## Auteurs
 
