@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configuration Escalier Musical</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      :root {
+        /* Ta Palette Originale */
+        --dark-bg: #393d3f;
+        --light-bg: #fdfdff;
+        --blue-light: #62929e;
+        --blue-dark: #546a7b;
+        --shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        --radius: 10px;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      /* --- HEADER --- */
+      header {
+        background-color: var(--dark-bg);
+        color: var(--light-bg);
+        padding: 25px 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 600;
+      }
+
+      .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #fff;
+      }
+      .toggle-btn {
+        background-color: var(--blue-light);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      /* --- MAIN CONTENT --- */
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 80px;
+        padding-bottom: 50px;
+        overflow-y: auto;
+      }
+
+      #stairs-wrapper {
+        position: relative;
+        width: 800px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-bottom: 60px;
+      }
+
+      /* --- STYLE DES MARCHES --- */
+      .step-container {
+        width: 680px;
+        position: relative;
+        margin-bottom: 25px;
+        transition: all 0.3s ease;
+      }
+
+      .step-header {
+        background-color: white;
+        height: 70px;
+        padding: 0 30px;
+        border-radius: var(--radius); /* Arrondi par défaut */
+        box-shadow: var(--shadow);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        border-left: 14px solid var(--dark-bg);
+        position: relative;
+        transition: all 0.2s ease;
+        z-index: 6; /* Important pour être au-dessus du piano */
+      }
+
+      .step-header:hover {
+        transform: translateX(-4px) translateY(-2px);
+        background-color: #fffbfb;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+      }
+
+      .step-title {
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--dark-bg);
+      }
+      .step-note {
+        font-weight: 700;
+        color: #000;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 1.4rem;
+      }
+      .arrow {
+        font-size: 1rem;
+        transition: transform 0.3s;
+        color: #666;
+      }
+
+      /* --- MODIFICATIONS ICI : État actif (Ouvert) --- */
+      .step-container.active {
+        z-index: 1000 !important;
+      }
+      .step-container.active .arrow {
+        transform: rotate(180deg);
+      }
+
+      /* C'EST ICI QUE SE REGLE LE PROBLEME D'ANGLE */
+      .step-container.active .step-header {
+        border-left-color: var(--blue-light);
+        /* On rend le bas carré pour coller au piano */
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        /* On enlève l'ombre du header pour que ce soit le bloc complet qui fasse l'ombre */
+        box-shadow: none;
+        background-color: #fffbfb; /* Garde la couleur du hover */
+      }
+
+      .piano-wrapper {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s ease-out;
+        background-color: white;
+        /* Arrondi uniquement en bas */
+        border-radius: 0 0 var(--radius) var(--radius);
+        width: 100%;
+        /* Grosse ombre sur le bloc complet quand il est ouvert */
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+        position: relative;
+        z-index: 5;
+        /* Petit hack pour éviter un trait blanc entre le header et le piano */
+        margin-top: -1px;
+        padding-top: 1px;
+      }
+
+      .step-container.active .piano-wrapper {
+        max-height: 350px;
+        border: 1px solid #ddd;
+        border-top: none;
+      }
+
+      /* --- PIANO --- */
+      .piano {
+        display: flex;
+        justify-content: center;
+        position: relative;
+        user-select: none;
+        padding: 20px 10px;
+        overflow-x: auto;
+      }
+
+      .octave-block {
+        position: relative;
+        display: flex;
+        flex-direction: row;
+      }
+
+      .key {
+        box-sizing: border-box;
+        border: 1px solid #999;
+        border-radius: 0 0 5px 5px;
+        cursor: pointer;
+        text-align: center;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 8px;
+        position: relative;
+        box-shadow: inset 0 -3px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      .key:active {
+        background-color: #eee;
+      }
+
+      .key.white {
+        width: 42px;
+        height: 140px;
+        background: white;
+        z-index: 1;
+        color: #333;
+        margin: 0;
+      }
+
+      .key.black {
+        width: 26px;
+        height: 90px;
+        background: var(--dark-bg);
+        color: white;
+        position: absolute;
+        z-index: 2;
+        top: 0;
+        border: 1px solid #000;
+        box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.4);
+      }
+
+      .key.black:active {
+        background-color: var(--blue-dark);
+      }
+
+      .key span {
+        pointer-events: none;
+        writing-mode: vertical-lr;
+        transform: rotate(180deg);
+        font-family: monospace;
+        font-size: 0.85rem;
+        font-weight: bold;
+      }
+      .key.black span {
+        color: white;
+        margin-bottom: 6px;
+        font-size: 0.7rem;
+      }
+
+      /* --- SECTION EXEMPLES MUSIQUE --- */
+      .examples-section {
+        width: 100%;
+        max-width: 800px;
+        margin-top: 20px;
+        padding: 0 20px;
+        box-sizing: border-box;
+      }
+
+      .examples-section h2 {
+        color: var(--dark-bg);
+        margin-bottom: 30px;
+        font-size: 2rem;
+        font-weight: 700;
+        text-align: left;
+      }
+
+      .examples-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+
+      .example-btn {
+        background: var(--dark-bg);
+        color: #fdfdff;
+        padding: 20px 28px;
+        border-radius: var(--radius);
+        border: none;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .example-btn:hover {
+        transform: translateY(-3px);
+        background-color: var(--blue-dark);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .example-btn.active {
+        background: var(--blue-light);
+        box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.2);
+      }
+
+      /* --- FOOTER --- */
+      footer {
+        background: var(--dark-bg);
+        padding: 25px 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.2);
+        color: var(--light-bg);
+        margin-top: auto;
+      }
+
+      .footer-text {
+        font-size: 1.1rem;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Configuration Escalier</h1>
+      <div class="toggle-container">
+        <span>SYSTÈME</span>
+        <div class="toggle-btn" id="sysBtn" onclick="toggleSystem()">OFF</div>
+      </div>
+    </header>
+
+    <main>
+      <div id="stairs-wrapper"></div>
+      <div class="examples-section">
+        <h2>Exemples musique :</h2>
+        <div class="examples-grid">
+          <button class="example-btn"><span>Musique 1</span></button>
+          <button class="example-btn"><span>Musique 2</span></button>
+          <button class="example-btn"><span>Musique 3</span></button>
+          <button class="example-btn"><span>Musique 4</span></button>
+          <button class="example-btn"><span>Musique 5</span></button>
+          <button class="example-btn"><span>Musique 6</span></button>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <span class="footer-text">Rojhat, Kaï, Alexis, Medelys, Lucille</span>
+      <span class="footer-text">copyleft &#127279;</span>
+    </footer>
+    <script>
+      const offsetPerStep = 60;
+      const socket = io(); // Se connecte automatiquement au serveur Node.js
+
+      const numberOfSteps = 4; // On reste sur 2 marches comme convenu
+
+      // Mapping complet pour éviter les erreurs de pistes vides
+      const noteToTrack = {
+        Do2: 1,
+        "Do#2": 2,
+        Ré2: 3,
+        "Ré#2": 4,
+        Mi2: 5,
+        Fa2: 6,
+        "Fa#2": 7,
+        Sol2: 8,
+        "Sol#2": 9,
+        La2: 10,
+        "La#2": 11,
+        Si2: 12,
+        Do3: 13,
+        "Do#3": 14,
+        Ré3: 15,
+        "Ré#3": 16,
+        Mi3: 17,
+        Fa3: 18,
+        "Fa#3": 19,
+        Sol3: 20,
+        "Sol#3": 21,
+        La3: 22,
+        "La#3": 23,
+        Si3: 24,
+        Do4: 25,
+      };
+
+      let configurationActuelle = { 1: "Do2", 2: "Do2", 3: "Do2", 4: "Do2" };
+
+      function generateOctaveHTML(octaveNumber, stepIndex) {
+        const positions = {
+          posDos: 28,
+          posRes: 78,
+          posFas: 152,
+          posSols: 197,
+          posLas: 242,
+        };
+        return `
+      <div class="octave-block">
+        <div class="key white" onclick="selectNote(${stepIndex}, 'Do${octaveNumber}')"><span>Do${octaveNumber}</span></div>
+        <div class="key white" onclick="selectNote(${stepIndex}, 'Ré${octaveNumber}')"><span>Ré${octaveNumber}</span></div>
+        <div class="key white" onclick="selectNote(${stepIndex}, 'Mi${octaveNumber}')"><span>Mi${octaveNumber}</span></div>
+        <div class="key white" onclick="selectNote(${stepIndex}, 'Fa${octaveNumber}')"><span>Fa${octaveNumber}</span></div>
+        <div class="key white" onclick="selectNote(${stepIndex}, 'Sol${octaveNumber}')"><span>Sol${octaveNumber}</span></div>
+        <div class="key white" onclick="selectNote(${stepIndex}, 'La${octaveNumber}')"><span>La${octaveNumber}</span></div>
+        <div class="key white" onclick="selectNote(${stepIndex}, 'Si${octaveNumber}')"><span>Si${octaveNumber}</span></div>
+        <div class="key black" style="left: ${positions.posDos}px" onclick="selectNote(${stepIndex}, 'Do#${octaveNumber}')"><span>Do#${octaveNumber}</span></div>
+        <div class="key black" style="left: ${positions.posRes}px" onclick="selectNote(${stepIndex}, 'Ré#${octaveNumber}')"><span>Ré#${octaveNumber}</span></div>
+        <div class="key black" style="left: ${positions.posFas}px" onclick="selectNote(${stepIndex}, 'Fa#${octaveNumber}')"><span>Fa#${octaveNumber}</span></div>
+        <div class="key black" style="left: ${positions.posSols}px" onclick="selectNote(${stepIndex}, 'Sol#${octaveNumber}')"><span>Sol#${octaveNumber}</span></div>
+        <div class="key black" style="left: ${positions.posLas}px" onclick="selectNote(${stepIndex}, 'La#${octaveNumber}')"><span>La#${octaveNumber}</span></div>
+      </div>`;
+      }
+
+      function createPianoHTML(stepIndex) {
+        return `<div class="piano">
+      ${generateOctaveHTML(2, stepIndex)}
+      ${generateOctaveHTML(3, stepIndex)}
+      <div class="key white" onclick="selectNote(${stepIndex}, 'Do4')"><span>Do4</span></div>
+    </div>`;
+      }
+
+      // Génération des marches
+      const container = document.getElementById("stairs-wrapper");
+      for (let i = numberOfSteps; i >= 1; i--) {
+        const div = document.createElement("div");
+        div.className = "step-container";
+        div.id = `step-${i}`;
+        div.style.zIndex = i * 10;
+        div.style.marginLeft = `${(i - 1) * offsetPerStep}px`;
+        div.innerHTML = `
+      <div class="step-header" onclick="togglePiano(${i})">
+        <span class="step-title">Marche ${i}</span>
+        <div class="step-note">
+          <span id="note-display-${i}">Do2</span> 
+          <span class="arrow">▼</span>
+        </div>
+      </div>
+      <div class="piano-wrapper">${createPianoHTML(i)}</div>`;
+        container.appendChild(div);
+      }
+
+      function togglePiano(id) {
+        const step = document.getElementById(`step-${id}`);
+        const isActive = step.classList.contains("active");
+        document
+          .querySelectorAll(".step-container")
+          .forEach((el) => el.classList.remove("active"));
+        if (!isActive) step.classList.add("active");
+      }
+
+      function selectNote(stepId, noteName) {
+        document.getElementById(`note-display-${stepId}`).innerText = noteName;
+        togglePiano(stepId);
+
+        const trackNumber = noteToTrack[noteName] || 1;
+
+        // ENVOI AU SERVEUR (Indispensable pour l'Arduino)
+        socket.emit("changeNote", {
+          step: stepId,
+          track: trackNumber,
+        });
+        console.log(`Marche ${stepId} configurée sur piste ${trackNumber}`);
+      }
+
+      function toggleSystem() {
+        const btn = document.getElementById("sysBtn");
+        const isOn = btn.innerText === "OFF";
+        btn.innerText = isOn ? "ON" : "OFF";
+        btn.style.backgroundColor = isOn
+          ? "var(--blue-dark)"
+          : "var(--blue-light)";
+
+        // On informe aussi le serveur si besoin
+        socket.emit("systemToggle", isOn);
+      }
+
+      document.querySelectorAll(".example-btn").forEach((btn) => {
+        btn.addEventListener("click", function () {
+          const musicName = this.textContent.trim();
+
+          // 1. Gérer l'apparence visuelle du bouton
+          document
+            .querySelectorAll(".example-btn")
+            .forEach((b) => b.classList.remove("active"));
+          this.classList.add("active");
+
+          // 2. Logique spécifique pour "Musique 1"
+          if (musicName === "Musique 1") {
+            // Définition des pistes pour chaque marche
+            const presetMusique1 = {
+              1: 26, // Marche 1 -> Piste 26
+              2: 27, // Marche 2 -> Piste 27
+              3: 28, // Marche 3 -> Piste 28
+              4: 30, // Marche 4 -> Piste 29
+            };
+
+            console.log("Application du preset Musique 1...");
+
+            // On boucle sur les 4 marches pour mettre à jour l'interface et envoyer à l'Arduino
+            for (let stepId in presetMusique1) {
+              const trackNum = presetMusique1[stepId];
+
+              // Mise à jour de l'affichage texte sur la marche
+              const display = document.getElementById(`note-display-${stepId}`);
+              if (display) display.innerText = "Piste " + trackNum;
+
+              // Envoi de l'ordre au serveur Node.js (qui transmet à l'Arduino)
+              socket.emit("changeNote", {
+                step: parseInt(stepId),
+                track: trackNum,
+              });
+            }
+          }
+
+          console.log("Lecture de :", musicName);
+        });
+      });
+    </script>
+  </body>
+</html>
