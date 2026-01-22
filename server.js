@@ -9,18 +9,18 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // --- CONFIGURATION SÉRIE ---
-// Remplacez 'COM3' par votre port (ex: '/dev/ttyACM0' sur Mac/Linux)
+// Remplacer 'COM5' par le bon port ('/dev/ttyACM0' sur Mac/Linux)
 const port = new SerialPort({ path: 'COM5', baudRate: 115200 });
 const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
-app.use(express.static(__dirname)); // Sert votre fichier HTML
+app.use(express.static(__dirname)); // Sert le fichier HTML
 
 io.on('connection', (socket) => {
     console.log('Interface Web connectée');
 
     // Quand l'utilisateur change une note sur le web
     socket.on('changeNote', (data) => {
-        // data = { step: 1, track: 5 }
+        // format: data = { step: 1, track: 5 }
         const cmd = `M${data.step}:${data.track}\n`;
         port.write(cmd);
         console.log('Envoi vers Arduino:', cmd);
